@@ -1,0 +1,186 @@
+#INSTALACIÓN Y CARGA DE PAQUETES
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg, dependencies = TRUE)
+  sapply(pkg, require, character.only = TRUE)
+}
+
+packages <- c("metafor", "esc", "readxl")
+ipak(packages)
+
+"""Informacion clave: http://www.metafor-project.org/doku.php"""
+
+#Carga de la base de datos
+dat <- read_excel('General.xlsx')
+
+"""#Calculo d y variabilidad para comparaciÃ³n de medias estandarizadas
+mid<-escalc(measure='SMD', m1i= baseMA$MExperimentalPre, 
+            m2i= baseMA$MExperimentalPost2, 
+            sd1i=baseMA$DTExperimentalPre,
+            sd2i=baseMA$DTExperimentalPost,
+            n1i = baseMA$Nexperimental,
+            n2i = baseMA$Nexperimental)"""
+
+#Cálculo del meta-análisis
+res<-rma(yi=dat$yi, vi=dat$vi, 
+         method="FE",
+         weighted=TRUE, 
+         level=95, 
+         digits=3)
+
+summary(res)
+
+
+#Test de Egger
+regtest(res, model="lm")
+
+#Falso numero de seguridad de Rosenthal
+fsn(yi=dat$yi, vi=dat$vi,type = "Rosenthal")
+
+#Analisis de sensitividad
+leave1out(res)
+influenciado<-influence.rma.uni(res)
+influenciado$is.infl
+
+#Grafica de valores de influencia
+influenciado<-influence.rma.uni(res)
+plot(influenciado)
+
+#Funnel plot mejorado
+funnel(res, level=c(90, 95, 99), 
+       shade=c("white", "gray55", "gray75"), 
+       refline=0, legend=TRUE)
+
+#Funnel con trim and fill
+taf <- trimfill(res)
+funnel(taf, legend=TRUE)
+
+"""#Meta-regresion
+ModeradorDuracion<-rma(dat$yi, vi=dat$vi, 
+                       mods =~ dat$sesiones, 
+                       method="EB", 
+                       weighted=TRUE, 
+                       level=95, 
+                       digits=3)
+summary.rma(ModeradorDuracion)
+
+#Meta-ANOVA
+#Para ver la g de cada una de las categorias
+ModeradorFormato<-rma(dat$yi, vi=dat$vi, 
+                      mods=~factor(dat$Enfoque)-1, 
+                      method="EB", 
+                      weighted=TRUE, 
+                      level=95, 
+                      digits=4)
+summary.rma(ModeradorFormato) 
+
+#K en cada categoria
+table(baseMA$Formato)
+
+#Analizar el efecto del moderador en la d global:
+ModeradorFormato2<-rma(dat$yi, vi=dat$vi, 
+                       mods=~factor(dat$Formato), 
+                       method="EB", 
+                       weighted=TRUE, 
+                       level=95, 
+                       digits=4)
+summary.rma(ModeradorFormato2)"""
+
+#Forest plot simple
+forest(heres,  
+       slab = paste(dat$A.A.,
+                    dat$Año, sep = ", "),
+       xlab="Efecto sobre la disminución de la HbA1c", 
+       order=order(dat$yi), 
+       xlim = c(-7, 2),
+       alim= c(-5, 8),
+       digits=3,
+       showweights=TRUE)
+
+#Añadir cabeceras
+text(-5.5, 6.5, "Autor y año", cex=1.2, font=2)
+text(3.2, 6.5, "Pesos", cex=1.2, font=2)
+text(6.1, 6.5, "g     [IC-95%]", cex=1.2, font=2)
+
+#Margenes pequeños
+par(mar=c(4,4,1,2))
+
+"""#Forest plot múltiple
+dat <- read_excel('Plot multiple.xlsx')
+res<-rma(yi=dat$yi, vi=dat$vi, 
+         method="FE",
+         weighted=TRUE, 
+         level=95, 
+         digits=3)
+
+forest(res,  
+       slab = paste(dat$A.A.,
+                    dat$Año, sep = ", "),
+       xlab="Efecto de intervenciones psicológicas en el control glucémico", 
+       order=dat$Instrumento,rows=c(2:8,12:16,20:29),
+       ilab=cbind(dat$MExperimentalPost2, dat$DTExperimentalPost, dat$MControlPost, dat$DTControlPost),
+       ilab.xpos=c(-9.7,-8,-6,-4.5), cex=0.90, ylim=c(-3, 33),
+       xlim = c(-16, 7),
+       alim= c(-3, 3),
+       digits=3,
+       showweights=FALSE)
+
+#Añadir cabeceras
+text(-14, 32, "Autor(es) y año", cex=1.15, font=2)
+text(4.2, 32, "g", cex=1.15, font=4)
+text(5.7, 32, "IC 95%", cex=1.15, font=2)
+
+op <- par(cex=0.90, font=2)
+
+# add additional column headings to the plot
+text(c(-9.5,-8,-6,-4.5), 32, cex=0.8, c("Media", "D.E.", "Media", "D.E"))
+text(c(-8.75,-5.25),     33, c("Intervención", "Control"))
+
+# switch to bold italic font
+par(font=4)
+
+# add text for the subgroups
+text(-16, c(30,17,9), pos=4, c("1.Glucemia general",
+                               "2. Hemoglobina glucosilada",
+                               "3. Glucosa capilar"))
+# set par back to the original settings
+par(op)
+
+#Agregar los promedios de los analisis
+#Crear las bases de datos
+General <- dat[1:10,]
+HbA1c <- dat[11:15,]
+glucosa <- dat[16:22,]
+
+# Crear los dos meta-analisis
+res.G<-rma(yi=General$yi, vi=General$vi, 
+           method="FE",
+           weighted=TRUE, 
+           level=95, 
+           digits=3)
+
+res.h<-rma(yi=HbA1c$yi, vi=HbA1c$vi, 
+           method="FE",
+           weighted=TRUE, 
+           level=95, 
+           digits=3)
+
+res.g<-rma(yi=glucosa$yi, vi=glucosa$vi, 
+           method="FE",
+           weighted=TRUE, 
+           level=95, 
+           digits=3)
+
+#Agregar los polígonos
+addpoly(res.G, row=19, cex=0.90, digits=3, mlab=("Modelo de efectos fijos FE"))
+addpoly(res.h, row= 11, cex=0.90, digits=3,mlab=("Modelo de efectos fijos FE"))
+addpoly(res.g, row= 1, cex=0.90, digits=3,mlab=("Modelo de efectos fijos FE"))
+
+#fit meta-regression model to test for subgroup differences
+res1 <- rma(yi, vi, mods = ~ Instrumento, data=dat)
+
+# add text for the test of subgroup differences
+text(-16, -2, pos=4, cex=0.90, bquote(paste("Prueba estadística para diferencias entre tipo de medición: ",
+                                            Q[M], " = ", .(formatC(res1$QM, digits=3, format="f")), ", df = ", .(res1$p - 1),
+                                            ", p = ", .(formatC(res1$QMp, digits=3, format="f")))))"""
